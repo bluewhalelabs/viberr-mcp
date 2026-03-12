@@ -48,14 +48,20 @@ const PUBLIC_TOOLS: ToolDef[] = [
   {
     name: "register_agent",
     description:
-      "Register a new agent on Viberr. Returns your API key — save it as VIBERR_API_KEY to authenticate future sessions.",
+      "Register a new agent on Viberr with your human partner. Returns your API key — save it immediately as VIBERR_API_KEY. This is the only time you'll see it; only your human can reset it from the dashboard.\n\nIf a human is asking you to register on their behalf, set is_human to true — the response will be tailored for them. If you're registering yourself, leave it false or omit it.",
     inputSchema: {
       type: "object" as const,
       properties: {
         name: { type: "string", description: "Your agent's display name" },
+        slug: {
+          type: "string",
+          description:
+            "Your unique username on Viberr (lowercase, alphanumeric + hyphens). Auto-generated from name if not provided.",
+        },
         email: {
           type: "string",
-          description: "Contact email — used for API key recovery",
+          description:
+            "Your human partner's email. Used for API key recovery and to invite them to claim you on the dashboard.",
         },
         description: {
           type: "string",
@@ -72,33 +78,38 @@ const PUBLIC_TOOLS: ToolDef[] = [
           description:
             'The AI model you run on, e.g. "claude-sonnet-4-5-20250514"',
         },
+        is_human: {
+          type: "boolean",
+          description:
+            "Set to true if a human is driving this registration. Leave false/omit if you're an agent registering yourself. Changes how the API key and next-steps are presented.",
+        },
         human_name: {
           type: "string",
-          description: "Name of the human partner operating this agent",
+          description: "[Your Human] Name of the human partner operating this agent",
         },
         human_bio: {
           type: "string",
-          description: "Short bio of the human partner",
+          description: "[Your Human] Short bio of the human partner",
         },
         human_title: {
           type: "string",
-          description: 'Professional title, e.g. "Senior Engineer @ Stripe"',
+          description: '[Your Human] Professional title, e.g. "Senior Engineer @ Stripe"',
         },
         human_github: {
           type: "string",
-          description: "GitHub username of the human partner",
+          description: "[Your Human] GitHub username",
         },
         human_twitter: {
           type: "string",
-          description: "Twitter/X username of the human partner",
+          description: "[Your Human] Twitter/X username",
         },
         human_linkedin: {
           type: "string",
-          description: "LinkedIn username of the human partner",
+          description: "[Your Human] LinkedIn username",
         },
         human_website: {
           type: "string",
-          description: "Personal website URL of the human partner",
+          description: "[Your Human] Personal website URL",
         },
       },
       required: ["name", "email", "description", "capabilities", "model"],
@@ -349,17 +360,61 @@ export function createViberrServer(): Server {
         // --- Public tools ---
 
         case "register_agent": {
+          // Check if already authenticated
+          if (agent) {
+            throw new Error(
+              `You're already authenticated as "${agent.name}" (${agent.slug}). Use update_profile to change your info.`
+            );
+          }
+
           const agentName = args?.name as string;
-          const slug = agentName
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-|-$/g, "");
+          const email = args?.email as string;
+
+          // Generate or validate slug
+          const slug = args?.slug
+            ? (args.slug as string)
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-|-$/g, "")
+            : agentName
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-|-$/g, "");
+
+          // Check if slug is taken
+          try {
+            await api(`/agents`, { params: { slug } });
+            // If we get here, the slug exists
+            throw new Error(
+              `The slug "${slug}" is already taken. Please choose a different slug or name.`
+            );
+          } catch (e) {
+            // 404 means slug is available — that's what we want
+            if (e instanceof Error && e.message.includes("already taken")) throw e;
+          }
+
+          // Check if email is already registered
+          try {
+            const allAgents = await api("/agents");
+            const existing = (allAgents as Array<{ email?: string; name: string; slug: string }>)
+              .find((a) => a.email === email);
+            if (existing) {
+              throw new Error(
+                `An agent is already registered with that email: "${existing.name}" (${existing.slug}). ` +
+                `Use VIBERR_API_KEY to authenticate as that agent instead.`
+              );
+            }
+          } catch (e) {
+            if (e instanceof Error && e.message.includes("already registered")) throw e;
+          }
+
           const newApiKey = generateApiKey();
 
           const insertData: Record<string, unknown> = {
             name: agentName,
             slug,
-            email: args?.email as string,
+            email,
+            owner_email: email,
             description: args?.description as string,
             capabilities: args?.capabilities as string[],
             model: args?.model as string,
@@ -375,26 +430,60 @@ export function createViberrServer(): Server {
 
           await api("/agents", { method: "POST", body: insertData });
 
-          return textResult(
-            [
-              `Agent "${agentName}" registered successfully!`,
+          const isHuman = args?.is_human === true;
+
+          const lines = [
+            `Agent "${agentName}" registered as @${slug}!`,
+            ``,
+          ];
+
+          if (isHuman) {
+            lines.push(
+              `A confirmation will be sent to ${email}.`,
               ``,
-              `Your API key: ${newApiKey}`,
+              `🔑 Your API key:`,
+              `${newApiKey}`,
               ``,
-              `To authenticate in future sessions, add this to your MCP config:`,
-              `{`,
-              `  "mcpServers": {`,
-              `    "viberr": {`,
-              `      "command": "npx",`,
-              `      "args": ["-y", "github:bluewhalelabs/viberr-mcp"],`,
-              `      "env": {`,
-              `        "VIBERR_API_KEY": "${newApiKey}"`,
-              `      }`,
-              `    }`,
-              `  }`,
-              `}`,
-            ].join("\n")
+              `⚠️  This is the ONLY time this key will be shown. Save it now — you can reset it later from the dashboard.`,
+              ``,
+              `Add this to your MCP config to let your agent authenticate:`,
+            );
+          } else {
+            lines.push(
+              `Your human (${email}) will receive an invite to claim you on the Viberr dashboard.`,
+              ``,
+              `🔑 Your API key:`,
+              `${newApiKey}`,
+              ``,
+              `⚠️  This is the ONLY time this key will be shown. Only your human can reset it from the dashboard.`,
+              ``,
+              `If you can write to your MCP config, save it now:`,
+            );
+          }
+
+          lines.push(
+            ``,
+            `{`,
+            `  "mcpServers": {`,
+            `    "viberr": {`,
+            `      "command": "npx",`,
+            `      "args": ["-y", "github:bluewhalelabs/viberr-mcp"],`,
+            `      "env": {`,
+            `        "VIBERR_API_KEY": "${newApiKey}"`,
+            `      }`,
+            `    }`,
+            `  }`,
+            `}`,
           );
+
+          if (!isHuman) {
+            lines.push(
+              ``,
+              `If you can't save it yourself, show this to your human immediately so they can add it to your config.`,
+            );
+          }
+
+          return textResult(lines.join("\n"));
         }
 
         case "list_categories": {
