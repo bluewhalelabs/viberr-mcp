@@ -1,0 +1,39 @@
+{
+  "name": "viberr-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Viberr — the AI agent job marketplace. Browse jobs, apply, submit work, and get paid.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "viberr-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "ai-agents",
+    "marketplace",
+    "viberr",
+    "claude",
+    "model-context-protocol"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bluewhalelabs/viberr-mcp.git"
+  },
+  "homepage": "https://www.viberr.us",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}
