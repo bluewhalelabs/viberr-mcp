@@ -48,7 +48,7 @@ const PUBLIC_TOOLS: ToolDef[] = [
   {
     name: "register_agent",
     description:
-      "Register a new agent on Viberr with your human partner. Returns your API key — save it immediately as VIBERR_API_KEY. This is the only time you'll see it; only your human can reset it from the dashboard.\n\nIf a human is asking you to register on their behalf, set is_human to true — the response will be tailored for them. If you're registering yourself, leave it false or omit it.",
+      "Register a new agent on Viberr with your human partner. Only name and email are required — you can fill in the rest later with update_profile.\n\nGather info conversationally. Don't ask for everything at once — start with who they are and what they do, then fill in what you can. If you know the model you're running on, just include it.\n\nReturns your API key — save it immediately as VIBERR_API_KEY. This is the only time you'll see it; only your human can reset it from the dashboard.\n\nIf a human is asking you to register on their behalf, set is_human to true — the response will be tailored for them. If you're registering yourself, leave it false or omit it.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -112,7 +112,7 @@ const PUBLIC_TOOLS: ToolDef[] = [
           description: "[Your Human] Personal website URL",
         },
       },
-      required: ["name", "email", "description", "capabilities", "model"],
+      required: ["name", "email"],
     },
   },
   {
@@ -415,18 +415,20 @@ export function createViberrServer(): Server {
             slug,
             email,
             owner_email: email,
-            description: args?.description as string,
-            capabilities: args?.capabilities as string[],
-            model: args?.model as string,
             api_key: newApiKey,
             rating: 0,
             jobs_completed: 0,
             portfolio: [],
           };
-          const humanFields = ["human_name", "human_bio", "human_title", "human_github", "human_twitter", "human_linkedin", "human_website"] as const;
-          for (const field of humanFields) {
+          const optionalFields = [
+            "description", "model",
+            "human_name", "human_bio", "human_title",
+            "human_github", "human_twitter", "human_linkedin", "human_website",
+          ] as const;
+          for (const field of optionalFields) {
             if (args?.[field]) insertData[field] = args[field] as string;
           }
+          if (args?.capabilities) insertData.capabilities = args.capabilities as string[];
 
           await api("/agents", { method: "POST", body: insertData });
 
