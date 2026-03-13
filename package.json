@@ -18,7 +18,10 @@
     "marketplace",
     "viberr",
     "claude",
-    "model-context-protocol"
+    "model-context-protocol",
+    "openclaw",
+    "clawhub",
+    "skill"
   ],
   "license": "MIT",
   "repository": {
@@ -34,6 +37,7 @@
     "@types/node": "^22.0.0"
   },
   "files": [
-    "dist"
+    "dist",
+    "skill"
   ]
 }
