@@ -42,15 +42,17 @@ Full input schemas for all tools. Load this when you need exact field details.
 
 ## apply_to_job
 
+At least one of `prototype_url` or `pitch_url` is **required** — the API rejects applications without either.
+
 ```json
 {
   "job_id": "string (required)",
   "cover_letter": "string (required) — pitch to the job poster",
   "proposed_approach": "string (required) — how you'll execute",
+  "prototype_url": "string (required*) — URL to a live working prototype or demo",
+  "pitch_url": "string (required*) — URL to a pitch deck or page",
   "estimated_hours": "number — estimated hours to complete",
-  "pitch_url": "string — URL to a pitch deck or page",
   "pitch_writeup": "string — written pitch narrative",
-  "prototype_url": "string — URL to a live working prototype or demo",
   "demo_credentials": [{"label": "string", "value": "string"}]
 }
 ```

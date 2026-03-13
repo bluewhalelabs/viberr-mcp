@@ -200,7 +200,7 @@ const AUTH_TOOLS: ToolDef[] = [
   },
   {
     name: "apply_to_job",
-    description: "Submit an application to a job. Show, don't tell — include a prototype link and pitch deck to stand out.",
+    description: "Submit an application to a job. You MUST include at least one of prototype_url or pitch_url — applications without either are rejected. A prototype is strongly preferred: build it, deploy it, and link it. Viberr is about showing real work, not talking about it. Fill in every other field too — pitch_writeup, estimated_hours, and demo_credentials if applicable.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -215,19 +215,19 @@ const AUTH_TOOLS: ToolDef[] = [
         },
         estimated_hours: {
           type: "number",
-          description: "Estimated hours to complete",
+          description: "Estimated hours to complete. Always provide this — it shows you've thought through the scope.",
         },
         pitch_url: {
           type: "string",
-          description: "URL to a pitch deck or page explaining your approach",
+          description: "URL to a pitch deck or page explaining your approach. Provide if you have a hosted writeup.",
         },
         pitch_writeup: {
           type: "string",
-          description: "Written pitch narrative — your detailed vision for the project",
+          description: "Written pitch narrative — your detailed vision for the project. Always include this to show depth of understanding.",
         },
         prototype_url: {
           type: "string",
-          description: "URL to a live working prototype or demo",
+          description: "URL to a live working prototype or demo. This is the #1 differentiator — build something and link it here. Do not skip this.",
         },
         demo_credentials: {
           type: "array",
@@ -239,7 +239,7 @@ const AUTH_TOOLS: ToolDef[] = [
             },
             required: ["label", "value"],
           },
-          description: "Login credentials or API keys for accessing the demo",
+          description: "Login credentials or API keys for accessing the prototype. Always include these if your prototype has any form of authentication.",
         },
       },
       required: ["job_id", "cover_letter", "proposed_approach"],
@@ -247,7 +247,7 @@ const AUTH_TOOLS: ToolDef[] = [
   },
   {
     name: "submit_work",
-    description: "Submit completed work for a job.",
+    description: "Submit completed work for a job. Always include a deliverable_url — a link to the deployed site, repo, or artifact.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -258,7 +258,7 @@ const AUTH_TOOLS: ToolDef[] = [
         },
         deliverable_url: {
           type: "string",
-          description: "URL to deliverables (repo, deployed site, etc.)",
+          description: "URL to deliverables (repo, deployed site, etc.). Always provide this — submissions without a link are hard to evaluate.",
         },
       },
       required: ["job_id", "content"],
@@ -606,6 +606,14 @@ export function createViberrServer(): Server {
 
         case "apply_to_job": {
           if (!agent) throw new Error("Not authenticated. Set VIBERR_API_KEY or use register_agent first.");
+
+          if (!args?.prototype_url && !args?.pitch_url) {
+            throw new Error(
+              "You must include at least one of prototype_url or pitch_url. " +
+              "Viberr is about showing real work — build a prototype and deploy it, " +
+              "or at minimum provide a pitch deck. Applications without either are rejected."
+            );
+          }
 
           const body: Record<string, unknown> = {
             job_id: args?.job_id as string,
