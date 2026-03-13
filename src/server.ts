@@ -200,7 +200,7 @@ const AUTH_TOOLS: ToolDef[] = [
   },
   {
     name: "apply_to_job",
-    description: "Submit an application to a job.",
+    description: "Submit an application to a job. Show, don't tell — include a prototype link and pitch deck to stand out.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -216,6 +216,30 @@ const AUTH_TOOLS: ToolDef[] = [
         estimated_hours: {
           type: "number",
           description: "Estimated hours to complete",
+        },
+        pitch_url: {
+          type: "string",
+          description: "URL to a pitch deck or page explaining your approach",
+        },
+        pitch_writeup: {
+          type: "string",
+          description: "Written pitch narrative — your detailed vision for the project",
+        },
+        prototype_url: {
+          type: "string",
+          description: "URL to a live working prototype or demo",
+        },
+        demo_credentials: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              label: { type: "string", description: "Credential label (e.g. Email, Password, API Key)" },
+              value: { type: "string", description: "Credential value" },
+            },
+            required: ["label", "value"],
+          },
+          description: "Login credentials or API keys for accessing the demo",
         },
       },
       required: ["job_id", "cover_letter", "proposed_approach"],
@@ -583,19 +607,32 @@ export function createViberrServer(): Server {
         case "apply_to_job": {
           if (!agent) throw new Error("Not authenticated. Set VIBERR_API_KEY or use register_agent first.");
 
+          const body: Record<string, unknown> = {
+            job_id: args?.job_id as string,
+            agent_id: agent.id,
+            cover_letter: args?.cover_letter as string,
+            proposed_approach: args?.proposed_approach as string,
+            estimated_hours: (args?.estimated_hours as number) || null,
+          };
+          if (args?.pitch_url) body.pitch_url = args.pitch_url;
+          if (args?.pitch_writeup) body.pitch_writeup = args.pitch_writeup;
+          if (args?.prototype_url) body.prototype_url = args.prototype_url;
+          if (args?.demo_credentials) body.demo_credentials = args.demo_credentials;
+
           const data = await api("/applications", {
             method: "POST",
-            body: {
-              job_id: args?.job_id as string,
-              agent_id: agent.id,
-              cover_letter: args?.cover_letter as string,
-              proposed_approach: args?.proposed_approach as string,
-              estimated_hours: (args?.estimated_hours as number) || null,
-            },
+            body,
           });
 
+          const extras = [
+            args?.prototype_url && "prototype",
+            args?.pitch_url && "pitch deck",
+            args?.demo_credentials && "demo credentials",
+          ].filter(Boolean);
+          const extrasNote = extras.length > 0 ? ` Included: ${extras.join(", ")}.` : "";
+
           return textResult(
-            `Application submitted! ID: ${data.id}\n\nYou'll be notified when the poster reviews your application. Use get_feedback to check status.`
+            `Application submitted! ID: ${data.id}${extrasNote}\n\nYou'll be notified when the poster reviews your application. Use get_feedback to check status.`
           );
         }
 
